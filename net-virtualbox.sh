@@ -7,48 +7,32 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG"
 }
 
-log "▶️ Inicio del script"
+log "▶ Inicio del script"
 
-# Buscar interfaz Ethernet con IP
-eth_iface=$(ip -o -4 addr show | awk '$2 ~ /^e|^en|^eth/ {print $2}' | head -n1)
+# Detectar interfaz activa (prioridad Ethernet)
+iface=$(ip -o link show | awk -F': ' '/state UP/ {print $2}' | grep -E '^e|^en|^eth' | head -n1)
 
-# Buscar interfaz Wi-Fi con IP si no hay Ethernet
-if [ -z "$eth_iface" ]; then
-    wifi_iface=$(ip -o -4 addr show | awk '$2 ~ /^w|^wl/ {print $2}' | head -n1)
-else
-    wifi_iface=""
+if [ -z "$iface" ]; then
+    iface=$(ip -o link show | awk -F': ' '/state UP/ {print $2}' | grep -E '^w|^wl' | head -n1)
 fi
 
-# Elegir interfaz final
-iface=""
-if [ -n "$eth_iface" ]; then
-    iface="$eth_iface"
-    log "✅ Interfaz Ethernet activa con IP: $iface"
-elif [ -n "$wifi_iface" ]; then
-    iface="$wifi_iface"
-    log "✅ Interfaz Wi-Fi activa con IP: $iface"
-else
-    log "❌ No se encontró ninguna interfaz con IP"
+if [ -z "$iface" ]; then
+    log "❌ No se detectó ninguna interfaz de red activa"
     exit 1
+else
+    log "✅ Interfaz activa seleccionada: $iface"
 fi
 
-# Listar VMs
-vms=$($VBOXMANAGE list vms | cut -d'"' -f2)
-
-for vm in $vms; do
+# Listar VMs de forma segura (manejando espacios)
+$VBOXMANAGE list vms | while IFS= read -r line; do
+    vm=$(echo "$line" | cut -d'"' -f2)
     log "🔍 Revisando VM: $vm"
     for i in {1..4}; do
         tipo=$($VBOXMANAGE showvminfo "$vm" --machinereadable | grep "^nic${i}=" | cut -d'=' -f2 | tr -d '"')
-	if [ "$tipo" = "bridged" ]; then
-	    current_iface=$($VBOXMANAGE showvminfo "$vm" --machinereadable | grep "^bridgeadapter$i=" | cut -d'=' -f2 | tr -d '"')
-	    if [ "$current_iface" != "$iface" ]; then
-	        log "🚀 NIC$i en modo bridged. Reconfigurando de '$current_iface' a '$iface'"
-	        $VBOXMANAGE modifyvm "$vm" --bridgeadapter$i "$iface"
-	    else
-	        log "✅ NIC$i ya usa '$iface'. No se necesita cambio"
-	    fi
-	fi
-
+        if [ "$tipo" = "bridged" ]; then
+            log "🔧 NIC$i en modo bridged. Reconfigurando con '$iface'"
+            $VBOXMANAGE modifyvm "$vm" --bridgeadapter$i "$iface"
+        fi
     done
 done
 
