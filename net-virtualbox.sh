@@ -30,10 +30,12 @@ $VBOXMANAGE list vms | while IFS= read -r line; do
     for i in {1..4}; do
         tipo=$($VBOXMANAGE showvminfo "$vm" --machinereadable | grep "^nic${i}=" | cut -d'=' -f2 | tr -d '"')
         if [ "$tipo" = "bridged" ]; then
+            notify-send "🔧 NIC$i en modo bridged. Reconfigurando con '$iface'"
             log "🔧 NIC$i en modo bridged. Reconfigurando con '$iface'"
             $VBOXMANAGE modifyvm "$vm" --bridgeadapter$i "$iface"
         fi
     done
 done
 
+notify-send "Script finalizado correctamente."
 log "✅ Script finalizado correctamente."
