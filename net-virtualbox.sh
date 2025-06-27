@@ -37,5 +37,5 @@ $VBOXMANAGE list vms | while IFS= read -r line; do
     done
 done
 
-notify-send "Script finalizado correctamente."
-log "✅ Script finalizado correctamente."
+notify-send "VB - Canvi xarxa - Finalitzat"
+log "VB - Canvi Xarxa - Finalitzat"
