@@ -28,11 +28,18 @@ $VBOXMANAGE list vms | while IFS= read -r line; do
     vm=$(echo "$line" | cut -d'"' -f2)
     log "🔍 Revisando VM: $vm"
     for i in {1..4}; do
+        # Obtener tipo de conexión y adaptador actual
         tipo=$($VBOXMANAGE showvminfo "$vm" --machinereadable | grep "^nic${i}=" | cut -d'=' -f2 | tr -d '"')
+        adapter=$($VBOXMANAGE showvminfo "$vm" --machinereadable | grep "^bridgeadapter${i}=" | cut -d'=' -f2 | tr -d '"')
+        
         if [ "$tipo" = "bridged" ]; then
-            notify-send "🔧 NIC$i en modo bridged. Reconfigurando con '$iface'"
-            log "🔧 NIC$i en modo bridged. Reconfigurando con '$iface'"
-            $VBOXMANAGE modifyvm "$vm" --bridgeadapter$i "$iface"
+            if [ "$adapter" != "$iface" ]; then
+                notify-send "🔧 NIC$i en modo bridged. Reconfigurando con '$iface'"
+                log "🔧 NIC$i en modo bridged. Adaptador actual: '$adapter'. Reconfigurando con '$iface'"
+                $VBOXMANAGE modifyvm "$vm" --bridgeadapter$i "$iface"
+            else
+                log "ℹ️ NIC$i ya está configurado correctamente con '$iface'"
+            fi
         fi
     done
 done
